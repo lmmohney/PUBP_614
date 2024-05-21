@@ -1,0 +1,90 @@
+---
+title: "PUBP 614: Assignment 2"
+author: "Elizabeth Mohney"
+output: html_document
+---
+
+# Instructions
+  The goal for this assignment is produce a chart that depicts some aspect of patterns in the distribution of freedom in the world. The broad focus is on distributions, but the specific focus is up to
+you: distribution across years, across countries, across countries, across different types of freedom,
+etc.
+  The data for the assignment are available at github: https://raw.githubusercontent.com/
+rfordatascience/tidytuesday/master/data/2022/2022-02-22/freedom.csv.
+The data are from Freedom House but also include some contextual information from the United
+Nations. Each row contains a country name, year, civil liberties score, political rights score, status
+score (derived from the previous two measures), and some information about the country’s region
+and development status.
+
+# Code
+```{r}
+library(here) #load packages
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+url <- "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-22/freedom.csv"
+dat <- read_csv(url(url))
+view(dat) #pull data from github
+```
+
+```{r}
+table(dat$Region_Name)
+```
+
+```{r}
+dat_2020 <- dat %>%    
+  filter(year=="2020") #filter to only include data from the year 2020
+```
+
+```{r}
+p <- ggplot(dat_2020, aes(x= PR, fill=Region_Name))
+
+p+geom_bar() #explore data
+```
+
+
+```{r}
+dat_2020_per <- dat %>%    
+  filter(year=="2020")%>%
+  group_by(Region_Name,PR) %>% #Breaks counts up by region and political rateing
+    summarize(n = n()) %>% 
+  mutate(prop = n/sum(n),          # calculate the proportion and save as a new var
+         pct = round(prop*100, 0))
+
+view(dat_2020_per) #check data
+```
+```{r fig.width=4, fig.height=7}
+p<-ggplot(dat_2020_per, aes(x= PR, y=pct, fill=PR))
+p+
+  geom_col()+
+  facet_wrap(~Region_Name, ncol=1, scales="fixed")+ #keep consistent scaling for each facet wrap
+  scale_x_reverse(breaks = seq(0, 8, by = 1))+ #1 is more free so reverse x axis to go from least to most free
+  theme(
+    panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  plot.title = element_text(hjust = 0.5),
+  plot.margin = unit(c(.2, .5, .2, .25), 
+                                "inches"), #fix margins
+        axis.text.y = element_text(color="black"),
+  axis.text.x = element_text(color="black"),
+    legend.position = "none", #suppress legends
+  axis.line=element_line()
+  )+
+  labs(x="Political Rights", y= "Percentage Within Region", title= "Poltical Rights Score Distribution in 2020 \n by Region")+
+    scale_fill_continuous(trans = 'reverse') #add color with 7 being the darker color
+```
+
+```{r}
+ggsave("assignment_2.png")
+#ggsave(here ("",".png"),p, height= , width= )
+```
+
+# Reflection   
+  For this assignment I decided to focus on comparing the levels of political rights between different regions in 2020. I began by subsetting the data to only include the year 2020 then creating a bar graph of the distribution of the political rights which was filled in with the different geographic regions. This particular graph made it hard to see how the different regions compared to each other. 
+  
+  From there I decided to split up the different regions and compare the distribution of political rights among them using facet_wrap. This made it easier to compare differences amongst regions however this distribution was probably better represented by percentage among regions rather than the default counts as some regions had larger country counts. Inorder to do this I had to resubset the data to be grouped by region_name and PR which then allowed me to calculate the distribution of political rights. 
+  
+  From there I added aesthetic changes such as labels and removed the grid background to assist in the readability of the graph. One thing that I thought made a particularly large impact is the flipping of the x axis and adding a color gradient to the graph. I did this because Freedom Houses Methodology (https://freedomhouse.org/reports/freedom-world/freedom-world-research-methodology) states that 1 is the most political rights while 7 is the least which seems counterintuitive when reading a graph from left to right. By flipping the x axis we have a better understanding of the meaning of the distribution which is reiterated by the color gradient as the darker blue is associated with the negative of less political rights while the lighter blue is considered more positive.
+
+  One thing that I was unsuccessful with was that I attempted to have the x axis repeat on every single chart in the facet wrap as it only appears once at the bottom of the column. 

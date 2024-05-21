@@ -1,0 +1,106 @@
+---
+title: "PUBP 614: Assignment 3"
+author: "Elizabeth Mohney"
+output: html_document
+---
+
+# Instructions 
+  Your task is to perform a statistical analysis on data (Vdem) and then plot 2 visualizations of
+the model output. You should use ggplot to create your plots. NOTE: The 2 visualizations
+should visualize 2 different things; do not submit 2 different visualizations of the same thing.
+
+#Code
+```{r}
+library(here)
+library(tidyverse)
+library(broom)
+```
+
+```{r}
+dat<- readRDS(here("Datasets", "vdem_v13.rds"))
+View(dat)
+```
+
+```{r}
+summary(dat$v2x_polyarchy) #All of the other factors of democracy are connected to this area
+
+summary(dat$e_v2x_gencl_5C)
+```
+
+
+```{r}
+d_lm <- lm(formula = v2x_polyarchy ~ e_v2x_gencl_5C + e_v2x_gender_5C +e_v2x_genpp_5C,
+          data = dat) #linear regression  
+
+summary(d_lm)
+```
+
+```{r}
+d_df <- tidy(d_lm,  conf.int = TRUE) #turn into a dataframe 
+d_df 
+```
+
+```{r}
+d_df_n <- subset(d_df) #, term %nin% "(Intercept)" throwing error in rendering 
+p <- ggplot(d_df_n, mapping = aes(x = term,
+                                    y = estimate, ymin = conf.low, ymax = conf.high)) #add confidence interval
+p + geom_pointrange() + coord_flip()
+```
+
+```{r}
+clean_df <- subset(dat, !is.na(e_v2x_genpp_5C) & !is.na(e_v2x_gender_5C) & !is.na(e_v2x_gender_5C) & !is.na(v2x_polyarchy))
+```
+
+
+```{r}
+out_d_lm <- augment(d_lm, data = clean_df)
+head(out_d_lm)
+```
+
+```{r}
+fit_ols <- function(df) {
+  lm(formula = v2x_polyarchy ~ e_v2x_gencl_5C + e_v2x_gender_5C +e_v2x_genpp_5C , data = df)
+}
+
+out_tidy <- clean_df %>%
+    group_by(year) %>%
+    nest() %>% 
+    mutate(model = map(data, fit_ols),
+           tidied = map(model, tidy)) %>%
+    unnest(tidied, .drop = TRUE) #%>%
+    #filter(term %nin% "(Intercept)") throwing error when knitting in %nin%
+```
+
+```{r}
+view(out_tidy)
+```
+
+```{r}
+p <- ggplot(data = out_tidy,
+            mapping = aes(x = year, y = estimate,
+                          ymin = estimate - 2*std.error, #add error
+                          ymax = estimate + 2*std.error,
+                          group = term, color = term)) 
+
+p + geom_pointrange(position = position_dodge(width = 1)) +
+    scale_x_continuous(breaks = unique(clean_df$year)) + 
+    theme(legend.position = "top") +
+    labs(x = "Year", y = "Estimate", color = "Coefficeint Term") #coefficents over time
+```
+
+```{r}
+p <- ggplot(data = subset(out_tidy, year%%10==0), #only include data from every 10 years
+            mapping = aes(x = year, y = estimate,
+                          ymin = estimate - 2*std.error,
+                          ymax = estimate + 2*std.error,
+                          group = term, color = term))
+
+p + geom_pointrange(position = position_dodge(width = 1)) +
+    theme(legend.position = "top") +
+    labs(x = "Year", y = "Estimate", color = "Coefficeint Term")
+```
+
+# Reflection
+	For my dependent variable of the linear regression model I decided to focus on the measure of electoral democracy (v2x_polyarchy) which is “To what extent is the ideal of electoral democracy in its fullest sense achieved?” This measure of democracy seemed to be most robust as the other measures were influenced by the outcome of the electoral democracy index. 
+  For my independent variables I wanted to look at the different ways in which various forms of women participation in government influenced the outcome of positive electoral democracy using the women civil liberties (e_v2x_gencl_5c), women political empowerment index(e_v2x_gender_5c), and women political participation index (e_v2x_genpp_5c). The 5c category was utilized to get as much variation in the data as possible compared to 3c or 4c.   
+  The regression found that all three IVs were statistically significant with a positive correlation. The women's civil liberties and political empowerment had a much stronger correlation in comparison to that of  political participation. Inorder to visualize this I created the first plot to gain a better understanding of the impact of the correlation coefficients. With the visual the similarity between civil liberties and empowerment is highlighted much stronger compared to that political participation. For the second visualization I wanted to see if there was any variation over the influence of these coefficients which required writing a function to rerun the linear model for each year of the dataset. There was little change year to year in the coefficient’s weight.

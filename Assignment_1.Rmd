@@ -1,0 +1,62 @@
+---
+title: "PUBP 614: Assignment 1"
+author: "Elizabeth Mohney"
+output: html_document
+---
+
+# Instructions
+  The goal of this assignment is to become familiar with how ggplot works. Toward this goal, you
+will recreate one of W.E.B. Du Bois’ infographics from the Paris World Expo of 1900.
+The data for the assignment are at ajstark’s github site: [HERE]https://github.com/ajstarks/
+dubois-data-portraits/tree/master/challenge. There are 10 different “challenges” at the site. Each
+challenge folder contains the relevant data to be plotted and a .jpg of the original infographic.
+There is also a .pdf file that shows a cleaned-up version of the original.
+Choose among numbers 1, 4, or 5 at the top level of the folder. (Do not choose within the 2022 or
+2023 subfolders.) These are the most straightforward; you should be able to reproduce them with
+what we have learned in class so far.
+
+# Code
+
+```{r}
+library(here)
+library(tidyverse)
+```
+
+```{r}
+dat<- read_csv(here("Datasets", "challenge04_dat.csv"))
+view(dat)
+```
+```{r, fig.width=7, fig.height=6.5}
+p <- ggplot(data=dat, mapping=aes(x=Year, y=Free))
+ p+geom_area(fill="darkgreen")+ #Fill in Free Portion
+  geom_ribbon(aes(ymin = (Free-.02), ymax = 100), fill = "Black")+ #Fill in Rest of the graph
+  scale_y_reverse(expand = c(0, 0))+ # reverse y scale
+  scale_x_continuous(limits=c(1790,1870), breaks = seq(1790,1870,10), labels = seq(1790,1870,10), expand = c(0, 0), position = "top")+ #manually modify x labels 
+  theme_bw()+ #Cleans up background of plot
+  theme(axis.text.y=element_blank(), 
+        axis.title = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor= element_blank(),
+        panel.grid.major.x =element_line( size=.5, color="black"),
+        plot.title = element_text(hjust=0.5),
+        plot.subtitle = element_text(hjust=0.5),
+        plot.margin = unit(c(.5, .4, .4, .4), 
+                                "inches"),
+        axis.text.x = element_text(color="black")
+        )+
+  labs(title= expression("PORTION OF FREEMEN AND SLAVES AMONG AMERICAN NEGROES \n PORTION DES NÈGRES LIBRES ET DES ESCLAVES EN AMÉRIQUE"),
+       subtitle = "DONE BY ATLANTA UNIVERSITY")+ #add labels
+  geom_text(aes(label = paste0(round(Free), "%")), vjust = -.3 ,color = "black", size = 3.5)+ #auto add numbers and percentages
+  geom_text(label="Slaves \n Esclaves", x=1830, y=-50, color="white", size=12)+
+  geom_text(label="Free - Libre", x=1830, y=-5, color="black", size=6)+
+  geom_text(label="100%", x=1868, y=-9, size=3.5)+
+  geom_text(label="8", x=1791, y=-5.5, size=3.5)
+```
+
+# Reflection
+
+Getting the initial plot of the proportions of Free African Americans filled with green was easy, especially after the practice from the Healy book. I was able to utilize geom_area which was a common applicator with lots of examples online making trouble shooting easy.
+
+From there things became more complicated as the vast majority of my time was spent attempting to fill in the black portion of the graph for African Americans who were enslaved. I initially attempted to have two geom_areas with each representing one side of the proportion. However, this was unsuccessful as the two would just overlay on top of each other. Inorder to attempt to resolve this I spent a lot of time on stack overflow, w3 schools, and chat gpt before deciding to switch to a different approach and utilizing geom_ribbon in order to fill in second section of the proportion. After that the vast majority of the modifications were fairly basic such as adding in titles and modifying the x and y axis which made it easy to find code examples online and troubleshoot.  
+
+The one thing that I was unsuccessful with was adding percentages to the proportions. I attempted to manually add in the “%” symbol to the dataframe but this was unsuccessful as the Free variable was marked as a string instead of a numeric value and therefore no longer able to be plotted. I also attempted to add it in as part of the label but this also threw an error and was unsuccessful. I was also technically able to add in the 8 and 100 points on the graph but did so manually instead of automatically using the geom_text aes () within ggplot. The 8 and 100 were technically on the plot but they were hidden by stopping the plot exactly at the 1790 and 1870 marker instead of auto including the margin outside of the graphed area. 
