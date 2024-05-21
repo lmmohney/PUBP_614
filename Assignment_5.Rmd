@@ -1,0 +1,101 @@
+---
+title: "PUBP 614: Assignment 5"
+author: "Elizabeth Mohney"
+output: html_document
+---
+
+# Instructions
+  The goal of this assignment is to use data on either 1) school diversity in the US or 2) refugees to
+produce 3 charts:
+  • one chart that makes things look better than they are.
+  • one chart that makes things look worse than they are.
+  • one chart that does neither.
+  Of course, “better” and “worse” are subjective terms. But the general idea is that deceptive charts
+have a hidden agenda.
+  For example, you may wish to convey the idea school diversity in the US (or some part of the US)
+closely parallels population diversity. If the data do not actually support this idea, how might you
+nevertheless visualize them in a way that suggests that the idea is true?
+Or, in terms of the data on refugess: Perhaps you wish to convey the idea that the “refugee problem”
+is worsening at a much faster rate than is actually the case. How might you visualize the data in
+a way that suggests this?
+
+# Code
+```{r warning=FALSE, include=FALSE}
+library(here)
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+url <- "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-09-24/school_diversity.csv"
+dat <- read_csv(url(url))
+```
+
+```{r}
+dat_VA <- dat %>% 
+  filter(ST=="VA") #only include data from virginia
+view(dat_VA)
+```
+
+
+```{r}
+dat_VA_diverse <- dat_VA %>% 
+  filter(diverse=="Diverse")
+
+p<-ggplot(dat_VA_diverse, aes(x= SCHOOL_YEAR))
+p+
+  geom_bar()+
+  theme(
+    panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  plot.title = element_text(hjust = 0.5),
+        axis.text.y = element_text(color="black"),
+  axis.text.x = element_text(color="black")
+  )+
+  coord_cartesian(ylim = c(55,80))+
+  labs(x="Schools Classified as Diverse in Virginia", y= "Number of Schools", title= "Number of Diverse Schools in Virginia in 1995 and 2017")
+
+#ggsave("assignment_5_Diverse.png")
+```
+
+```{r}
+dat_VA_undiverse <- dat_VA %>% 
+  filter(diverse=="Undiverse")
+
+p<-ggplot(dat_VA_undiverse, aes(x= SCHOOL_YEAR))
+p+
+  geom_bar()+
+  theme(
+    panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  plot.title = element_text(hjust = 0.5),
+        axis.text.y = element_text(color="black"),
+  axis.text.x = element_text(color="black")
+  )+
+  labs(x="Schools Classified as Undiverse in Virginia", y= "Number of Schools", title= "Number of Undiverse Schools in Virginia in 1995 and 2017")
+#ggsave("assignment_5_undiverse.png")
+```
+
+```{r}
+dat_VA$diverse = factor(dat_VA$diverse, levels = c("Extremely undiverse", "Undiverse", "Diverse"), ordered = TRUE) #keep in specific order not just alphabetical 
+p<-ggplot(dat_VA, aes(x= diverse))
+p+
+  geom_bar()+
+  facet_wrap(~SCHOOL_YEAR)+
+  theme(
+    panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  plot.title = element_text(hjust = 0.5),
+        axis.text.y = element_text(color="black"),
+  axis.text.x = element_text(color="black")
+  )+
+  labs(x="Composition of Schools", y= "Number of Schools", title= "Distribution of Public Schools in Virginia")
+#ggsave("assignment_5_norm.png")
+```
+
+# Reflection
+  My first chart is an over exaggeration in how much diversity has increased in Virginia from 1995 to 2017. I think this one does a good job of over exaggerating the change in the number of schools classified as diverse by manipulating the scale, however this tactic is incredibly common and easy to spot on graphs as there is a marker of the deceit.  
+  
+  My second chart is an under exaggeration in how much diversity has increased in Virginia and I think this does a better job of concealing the actual data. The omission of extremely undiverse and diverse makes it seem to the viewer that there has been practically no change in the rate of diversity within schools. It would take the knowledge of the data set to know the different classifications within schools and their distribution that in reality more schools became diverse in comparison to undiverse and extremely undiverse. Just by looking at the chart there would be no indication of a change without relevant markers.
+  
+  The final more accurate distribution allows the viewer to see all the different classifications compared to one another and how they have shifted over time allowing for a better understanding of the change. 

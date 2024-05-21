@@ -1,0 +1,90 @@
+---
+title: "PUBP 614: Assignment 6"
+author: "Elizabeth Mohney"
+output: html_document
+---
+# Instructions
+  The goal of this assignment is to map data on mortality around the world over time. You should
+create at least 2 maps that visualize some dimension of the data that you think is interesting. You
+can incorporate time in your maps, but you do not have to do so. You can combine your maps as
+facets or animation, or you can keep them seperate. If separate, the maps should still be related;
+they should not tell two separate stories.
+  Your maps may cover the whol world, but they do not have to. If you wish, you may zoom in on
+a subsection of the world. If you do so, be sure to justify your decision in your reflection.
+
+# Code 
+```{r warning=FALSE, include=FALSE}
+library(here)
+library(socviz)
+library(tidyverse)
+library(maps)
+library(ggthemes)     # For theme_map()
+library(ggimage)
+library(readxl)
+library(gganimate)
+```
+
+
+```{r}
+mortality <- read_excel(here("Datasets", "global_mortality.xlsx"))
+
+mortality$country[mortality$country == "United States"] = "USA"
+mortality$country[mortality$country == "United Kingdom"] = "UK"
+mortality$country[mortality$country == "Cote d'Ivoire"] = "Ivory Coast"
+mortality$country[mortality$country == "Democratic Republic of Congo"] = "Democratic Republic of the Congo"
+mortality$country[mortality$country == "Congo"] = "Republic of Congo"
+mortality$country[mortality$country == "Macedonia"] = "North Macedonia" #Align names for two data sets
+
+
+world_map <- map_data("world") 
+```
+
+
+```{r}
+mortality$region <- mortality$country # Merge the datasets
+world_mort <- left_join(world_map, # dataset 1
+                  mortality, # dataset 2
+                  by = "region") # key variable(s) which can be more then one
+```
+
+```{r}
+#Help Figure out what countries aren't matched
+#world_mort_na <-  world_mort %>%
+    #filter(is.na(`Cardiovascular diseases (%)`))
+#table(world_mort_na$region)
+```
+
+```{r}
+world_mort_2016 <-  world_mort %>%
+    filter(year==2016) #only include data from 2016 which is the most recent 
+```
+
+
+```{r}
+p <- ggplot(world_mort_2016,
+aes(x = long, y = lat, #set up map
+group = group, fill = `Cardiovascular diseases (%)`)) #color fill based on cardiovascular disease
+p + geom_polygon(color = "black", linewidth = .1)+
+  labs(title = "World Map of the Percentage of Deaths from Cardiovasular Disease By Country in 2016", fill = "Percentage Rate")+
+   scale_fill_gradient(low = "white", high = "red") +
+  ggthemes::theme_map() 
+```
+
+```{r}
+p <- ggplot(world_mort,
+aes(x = long, y = lat,
+group = group, fill = `Cardiovascular diseases (%)`)) + geom_polygon(color = "black", linewidth = .1)+
+  labs(title = "World Map of the Percentage of Deaths from Cardiovasular Disease By Country", fill = "Percentage Rate")+
+   scale_fill_gradient(low = "white", high = "red") +
+  ggthemes::theme_map()+ 
+ transition_time(year) + #animated version
+    labs(title = "Percentage of Country Dieing from Cardiovasular Disease Year: {frame_time}")
+p
+#anim_save("cardiovascular.gif")
+```
+
+# Reflections
+  I decided to look at the percentage of deaths from cardiovascular disease in 2016 across the world. With the second visualization being the change of the percentage of deaths caused by cardiovascular disease over time shown through animation. By being able to compare not only which countries are impacted by cardiovascular disease but also the year, the viewer is able to see how the disease has impacted individuals and how this impact has changed.
+  
+  While, over time the animation is conceptually a good way to compare change there seems to be little visual fluctuations in the percentages of deaths except in a few select countries. However in context of the greater story with the static image this shows that cardiovascular disease is a major problem due to its high percentages of deaths and has historically been a major factor of death. This emphasizes the severity of the situation and draws attention to a disease that has impacted millions of people.  
+

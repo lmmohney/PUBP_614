@@ -1,0 +1,100 @@
+---
+title: "PUBP 614: Assignment 4"
+author: "Elizabeth Mohney"
+output: html_document
+---
+
+# Instructions 
+
+  The goal for this assignment is to produce a static and dynamic chart of some aspect of freedom over
+time in the world. You can use the same data from Freedom House that you used in Assignment 2
+(available HERE). You may use some alternative freedom-related data if you prefer (e.g., V-Dem
+has some such data).
+  You do not need to visualize the entire dataset. Choose some variable whose change over
+time and across (some number of) countries you would like to visualize.
+  To generate the static chart, use ggplot. Visualize either the start- and end-points for each country
+or produce a faceted chart of small-multiples.
+  To generate the dynamic chart, use plotly. If you wish, you may also use the animation extensions
+for ggplot that we discussed in class (e.g., gganimate), assuming that they work for the type of
+visualization that you want to do.
+
+
+# Code 
+```{r warning=FALSE, include=FALSE} 
+#echo=flase include output but not code message=Flase code but no output
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(plotly)
+library(htmlwidgets)
+```
+
+```{r}
+url <- "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-22/freedom.csv"
+dat <- read_csv(url(url))
+view(dat) 
+```
+
+```{r}
+table(dat$Region_Name)
+dat_Africa <- dat %>% 
+  filter(year=="2020" | year=="1995" |  year=="2000" | year=="2005" | year=="2010" | year=="2015")%>% #only include certain years
+  filter(Region_Name=="Africa")%>% #only include Africa 
+  mutate(avg=((PR+CL)/2)) #average Political Rights (PR) and Civil Liberties (CL) 
+```
+
+```{r}
+p <- ggplot(dat_Africa, aes(x= CL, y=PR, color=Status))
+p+
+  geom_point(position=position_jitter())+ #add jitter as most points overlap
+  facet_wrap(~year, scales="fixed")+ 
+  scale_x_reverse()+
+  scale_y_reverse()
+#ggsave("assignment_4.png")
+```
+
+```{r}
+dat_Africa_al <- dat %>% 
+  filter(Region_Name=="Africa") 
+
+fig <- dat_Africa_al %>%
+  plot_ly(
+          x = ~ CL, 
+          y = ~ PR, 
+          color = ~ Status, 
+          frame = ~ year, 
+          text = ~ country, 
+          hoverinfo = "text",
+          type = "scatter",
+          mode = "markers"
+          ) #turn into plotly 
+
+fig
+```
+
+```{r}
+
+fig <- dat_Africa_al %>%
+  plot_ly(
+          x = ~jitter(CL), 
+          y = ~ jitter(PR),
+          frame = ~ year, 
+          color= ~ Status,
+          text = ~ country, 
+          hoverinfo = "text",
+          type = "scatter",
+          mode = "markers"
+          ) %>%
+  layout(
+          xaxis = list(autorange="reversed"),
+                   yaxis = list(
+                     autorange="reversed"))
+
+fig
+#saveWidget(fig, file = "assignment_4_dyn.html")
+```
+
+# Reflection   
+  When looking at the change of African countries ratings for civil liberties and political rights each plot has different positives and negatives based on the goals of the author and what they wish to convey. 
+	The static plot does a good job of highlighting overarching trends of the continent due to the nature of classification from Freedom House as there is little change from year to year in a country's standing. The static plots are good for looking at the movement of the continent as a whole as the faceting makes it easy to compare different time distinctions as each section of the interval is available to the viewer at all times. It is potentially easier to highlight different trends or the impact of certain events as the author has full control over what years the view sees. 
+	The dynamic plot seems to be better to track movement of specific countries over time with the hover feature. Viewers are also able to see the individual movements of countries as they increase and decrease, getting a better understanding of the change. The most important part of the dynamic plot though is the amount of freedom that is given to the viewer as they have access to every single year of data and can easily stop the animation. This is specifically better for exploratory data analysis rather than conveying a message as the user has less control over what is seen in static plots.

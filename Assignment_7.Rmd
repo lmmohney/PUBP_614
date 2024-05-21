@@ -1,0 +1,90 @@
+---
+title: "PUBP 614: Assignment 7"
+author: "Elizabeth Mohney"
+output: html_document
+---
+
+# Instructions
+The goal of this assignment is to improve one of your earlier plots. You should improve the plot in
+2 ways:
+  • Change the visualization type
+  • Use theme_ and/or scale_ to improve its appearance
+  • Add tooltips (optional but recommended for practice)
+The idea is that this assignment will help you produce a visualization that is very close to a final
+product, one that is refined in its appearance and the amount and type of information it conveys.
+You should make at least 3 theme_ and/or scale_ changes. These can involve the appearance of the
+plot area, the axes, the font, etc., etc., etc.
+
+# Code 
+```{r warning=FALSE, include=FALSE}
+library(here)
+library(tidyverse)
+library(maps)
+library(ggthemes)     # For theme_map()
+library(ggimage)
+library(plotly)
+library(htmlwidgets)
+library(readxl)
+```
+
+
+```{r}
+mortality <- read_excel(here("Datasets", "global_mortality.xlsx"))
+
+mortality$country[mortality$country == "United States"] = "USA"
+mortality$country[mortality$country == "United Kingdom"] = "UK"
+mortality$country[mortality$country == "Cote d'Ivoire"] = "Ivory Coast"
+mortality$country[mortality$country == "Democratic Republic of Congo"] = "Democratic Republic of the Congo"
+mortality$country[mortality$country == "Congo"] = "Republic of Congo"
+mortality$country[mortality$country == "Macedonia"] = "North Macedonia" #match names to datasets
+
+
+world_map <- map_data("world") 
+```
+
+
+```{r}
+mortality$region <- mortality$country # Merge the datasets
+world_mort <- left_join(world_map, # dataset 1
+                  mortality, # dataset 2
+                  by = "region") # key variable(s) which can be more then one
+```
+
+```{r}
+#Help Figure out what countries aren't matched
+#world_mort_na <-  world_mort %>%
+    #filter(is.na(`Cardiovascular diseases (%)`))
+#table(world_mort_na$region)
+```
+
+```{r}
+world_mort_up <-  world_mort %>%
+    filter(year==2016 | year==1990)
+```
+
+```{r}
+
+breaks <- c(0, 10, 20, 30, 40, 50, 60, 70) #add bin numbers
+
+p <- ggplot(world_mort_up, aes(x = long, y = lat, group = group,
+                                fill = cut(`Cardiovascular diseases (%)`, breaks = breaks)
+                               )) +
+  geom_polygon(color = "black", linewidth = .1, aes(text= paste(" Country Name:", country,"\n Percentage of Deaths:", `Cardiovascular diseases (%)`, "%" ))) +
+  scale_fill_manual(values = c("#FFFFFF", "#FFEBEB", "#FFD5D5", "#FFB9B9", "#FF9D9D", "#FF8181", "#FF0000"),#add colors for bins 
+                    breaks = levels(cut(world_mort_up$`Cardiovascular diseases (%)`, breaks = breaks)), 
+                    labels = c("0-10", "10-20", "20-30", "30-40", "40-50", "50-60", "60-70")) +
+  labs(title = "World Map of the Percentage of Deaths from Cardiovascular Disease By Country in 1990 and 2016",
+       fill = "Percentage Rate") +
+  facet_wrap(~year, ncol = 1) +
+  ggthemes::theme_map() +
+  theme(panel.background = element_rect(fill = "#0077be"), #turn sea to be blue to better understnad color 
+        text = element_text(family = "Times New Roman", vjust = 0.5))
+
+ggplotly(p, tooltips=text)
+final <-ggplotly(p, tooltips=text)
+
+#saveWidget(final, file = "assignment_7_new.html")
+```
+
+# Reflections
+  I decided to switch from an animated plot to just a facet wrap of the first and last year recorded after the class critique. The other major critique that I received was the differences in region harder to see so I changed the continuous color gradient to a binned option increasing by 10. From there I added tool tips to be able to tell the country names and exact percentages. However, I was unable to get rid of the first line of the tool tips even when manually suppressing all tool tips. I then made some aesthetic changes by adding a blue background to represent the sea and changing the font to times new roman. 

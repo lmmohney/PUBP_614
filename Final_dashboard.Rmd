@@ -1,0 +1,240 @@
+---
+title: "Fail Rates on Math Assesments in Virginia Public Schools"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+pacman::p_load(here, tidyverse, plotly, dplyr, sf, ggthemes, tidygeocoder, magick, stringr, flex_dashboard)
+
+us_counties <- read_sf(here( "data", "data", "cb_2021_us_county_500k","cb_2021_us_county_500k.shp")) #County SF
+
+va_counties <- us_counties %>% 
+  filter(STATE_NAME == "Virginia") #Sub set to only include Va counties
+
+school <- read_csv(here("Datasets", "Assessments.csv")) #Read in assessment data from VDOE
+school_2 <- school %>% 
+  filter(Division == "Williamsburg-James City County Public Schools" | Division == "Greensville County Public Schools" | Division == "Alleghany Highlands Public Schools" | Division =="Fairfax County Public Schools") %>%
+  mutate(Division = case_when(
+  Division == "Williamsburg-James City County Public Schools"  ~ "James City County",
+   Division == "Alleghany Highlands Public Schools"  ~ "Covington city",
+    Division == "Fairfax County Public Schools" ~ "Fairfax city",
+  Division == "Greensville County Public Schools" ~ "Emporia city", #Change name of counties to match SF
+  TRUE ~ Division# Keeps all other names unchanged
+  )) 
+
+school_3<-school %>%
+      bind_rows(school_2) #Recombine the updated shape files 
+  
+cl_sch <- school_3 %>% 
+  filter(Subgroup =="All Students" & Subject=="Mathematics") %>% #Subset to only include all student averages and math assessments 
+  mutate(Division = str_remove(Division, "Public Schools$")) %>% #Drop Public school from the end of county names
+  mutate(
+    Division = str_replace_all(Division, regex("city", ignore_case = TRUE), "city")
+  )%>% #find all instances of city ignoring casing and change to "city"
+  mutate(Division = trimws(Division, which = "right")) %>% #remove weird spacing
+  mutate(Division = case_when(
+    Division == "Charles city County"  ~ "Charles City County", #Fix Capitalization on fringe cases
+    Division == "Williamsburg-James city County"  ~ "Williamsburg city",
+    Division == "Alleghany Highlands"  ~ "Alleghany County",
+    Division == "James city County"  ~ "James City County", 
+    TRUE ~ Division       # Keeps all other names unchanged
+  )) %>%
+  mutate(Fail = as.numeric(Fail)) %>% #Turn fail from a character value to a numeric 
+  rename(NAMELSAD = Division) #Rename division column to NAMELSAD in order to match SF
+
+va_school <- left_join(va_counties, # dataset for county maps
+                  cl_sch, #fail rate information
+                  by = "NAMELSAD")
+```
+
+# Overview {.sidebar data-width=150}
+This data encapsulates fail rates of students on Virginia standardized assessments (SOL's) from 2020-2021 to 2022-2023. While fail rates have decreased for all students certain demographic groups continue to lag behind the average student. Each tab offers a comparison of a different demographic groups by fail rates.    
+
+
+All Counties
+=====================================
+
+Column {data-width=550}
+-----------------------------------------------------------------------
+
+### Percent of Students Failed Mathematics Assesments by County in Virginia 
+```{r}
+p <- ggplot(data = va_school, na.rm=TRUE) +
+  geom_sf(aes(fill = Fail, text= paste("County Name:", NAMELSAD, "\n Percentage of Students who Failed:", Fail, "%" ))) + 
+  ggthemes::theme_map() +
+  scale_fill_continuous(low = "green", high = "red", 
+                      name = "Percentage Failed", guide="none") + #low fail rates are classified as green/high as red
+  labs(title = "Red Indicates High Fail Rates while Green Repersents Lower Fail Rates.")+
+   facet_wrap(~Year, nrow=3) #3 maps of Virginia in a line 
+ggplotly(p, tooltip="text") #add interactive elements
+```
+>Sourced from the Virginia Department of Education
+
+
+Column {data-width=450}
+-----------------------------------------------------------------------
+
+```{r, include=FALSE}
+arrow <- school_3 %>% #Change in demographic type 
+  filter((Year =="2020 - 2021"|Year== "2022 - 2023")) %>%#Only include first and last available years 
+  filter(Subgroup== "Students with Disabilities"|Subgroup== "All Students"|Subgroup== "Black"|Subgroup== "Economically Disadvantaged" |Subgroup== "Female" |Subgroup== "Foster Care" |Subgroup== "Hispanic" |Subgroup== "Homeless"|Subgroup== "Migrant" |Subgroup== "Male" | Subgroup== "Not Economically Disadvantage" | Subgroup== "White" | Subgroup== "Students with Disabilities" | Subgroup== "Students without Disabilities")%>%
+  mutate(Fail = as.numeric(Fail)) %>% #change from character to numeric variable 
+  group_by(Subgroup, Year) %>% #groups answers by demographic and year
+  summarize(Mean_Fail = mean(Fail, na.rm = TRUE)) #averages all counties fail rates demographics and year
+```
+
+
+### Percentage of Students Who Failed by Demogrpahic Group
+
+```{r}
+p <- ggplot(arrow, aes(x=Mean_Fail, y=reorder(Subgroup, Mean_Fail)))+ 
+  geom_point(size=5, aes(colour=Year, text=paste( "Year:", Year, "\n Mean Fail Rate:", Mean_Fail))) +
+  geom_line(arrow = arrow(length=unit(0.30,"cm"), ends="first", type = "closed"))+
+  scale_color_manual(values = c("2020 - 2021" = "red", "2022 - 2023" = "green")) +
+  theme_bw()+
+  theme(legend.position = "top", axis.text.y = element_text(angle = 40))+
+    labs(x = "Percent of Students Failed",
+         y = "Demographic Groups")
+p
+```
+
+Gender
+=====================================
+
+```{r, include=FALSE}
+type_sch <- school_3 %>% 
+  filter((Subgroup =="Female"|Subgroup== "Male") & `Subject` =="Mathematics") %>% #Subset Datasets
+  mutate(Fail = as.numeric(Fail)) #Fail to Numeric 
+
+mean_values <- type_sch %>% # find averages for lines on histograms
+  group_by(Subgroup, Year) %>%
+  summarize(mean_Fail = mean(Fail, na.rm = TRUE))
+```
+
+###
+```{r}
+p <- ggplot(data = type_sch, mapping = aes(x = Fail)) #data from subseted type school
+p + geom_histogram() +
+  facet_wrap(~Subgroup~Year) + #Separate histogram by subgroup and year
+  geom_vline(data = mean_values, aes(xintercept = mean_Fail, group = interaction(Subgroup, Year)),
+             color = "blue")+ #Add in average line on the histogram
+  theme_bw()+
+    labs(x = "Percent of Students who Failed",
+         y = "Number of Counties",
+         title = "Percent of Students Failed by Gender")
+```
+
+>Sourced from the Virginia Department of Education
+
+Race
+=====================================
+
+```{r, include=FALSE}
+race_sch <- school_3 %>% 
+  filter(Subject=="Mathematics" & (Subgroup== "Black" | Subgroup== "White" | Subgroup== "Asian" | Subgroup == "Hispanic"))  %>% 
+  mutate(Fail = as.numeric(Fail)) 
+
+mean_fail_race <- race_sch %>%
+  group_by(Subgroup, Year) %>%
+  summarize(mean_Fail = mean(Fail, na.rm = TRUE))
+```
+
+###
+```{r}
+
+p <- ggplot(data = race_sch, mapping = aes(x = Fail))
+p + geom_histogram() +
+  facet_wrap(~Year~Subgroup, nrow=3) +
+  geom_vline(data = mean_fail_race, aes(xintercept = mean_Fail, group = interaction(Subgroup, Year)),
+             color = "blue")+
+  theme_bw()+
+    labs(x = "Percent of Students who Failed",
+         y = "Number of Counties",
+         title = "Percent of Students Failed by Race")
+```
+
+>Sourced from the Virginia Department of Education
+
+Socioeconomic 
+=====================================
+
+```{r}
+econ_sch <- school_3 %>% 
+  filter((Subgroup =="Economically Disadvantaged"|Subgroup== "Not Economically Disadvantaged") & `Subject` =="Mathematics") %>%
+  mutate(Fail = as.numeric(Fail))
+
+mean_fail_ec <- econ_sch %>%
+  group_by(Subgroup, Year) %>%
+  summarize(mean_Fail = mean(Fail, na.rm = TRUE))
+```
+
+```{r}
+p <- ggplot(data = econ_sch, mapping = aes(x = Fail))
+p + geom_histogram() +
+  facet_wrap(~Subgroup~Year) +
+  geom_vline(data = mean_fail_ec, aes(xintercept = mean_Fail, group = interaction(Subgroup, Year)),
+             color = "blue")+
+  theme_bw()+
+    labs(x = "Percent of Students who Failed",
+         y = "Number of Counties",
+         title = "Percent of Students Failed by Economic Status")
+```
+
+>Sourced from the Virginia Department of Education
+
+Disability Status
+=====================================
+
+```{r}
+dis_sch <- school_3 %>% 
+  filter((Subgroup =="Students with Disabilities"|Subgroup== "Students without Disabilities") & `Subject` =="Mathematics") %>%
+  mutate(Fail = as.numeric(Fail))
+
+mean_fail_dis <- dis_sch %>%
+  group_by(Subgroup, Year) %>%
+  summarize(mean_Fail = mean(Fail, na.rm = TRUE))
+```
+
+```{r}
+p <- ggplot(data = dis_sch, mapping = aes(x = Fail))
+p + geom_histogram() +
+  facet_wrap(~Subgroup~Year) +
+  geom_vline(data = mean_fail_dis, aes(xintercept = mean_Fail, group = interaction(Subgroup, Year)),
+             color = "blue")+
+  theme_bw()+
+    labs(x = "Percent of Students who Failed",
+         y = "Number of Counties",
+         title = "Percent of Students Failed by Disability Status")
+```
+
+>Sourced from the Virginia Department of Education
+
+Home Status 
+=====================================
+
+```{r}
+home_sch <- school_3 %>% 
+  filter((Subgroup =="Homeless"|Subgroup== "Foster Care"|Subgroup== "Migrant") & `Subject` =="Mathematics") %>%
+  mutate(Fail = as.numeric(Fail))
+
+mean_fail_home <- home_sch %>%
+  group_by(Subgroup, Year) %>%
+  summarize(mean_Fail = mean(Fail, na.rm = TRUE))
+```
+
+```{r}
+p <- ggplot(data = home_sch, mapping = aes(x = Fail))
+p + geom_histogram() +
+  facet_wrap(~Subgroup~Year) +
+  geom_vline(data = mean_fail_home, aes(xintercept = mean_Fail, group = interaction(Subgroup, Year)),
+             color = "blue")+
+  theme_bw()+
+    labs(x = "Percent of Students who Failed",
+         y = "Number of Counties",
+         title = "Percent of Students Failed by Home Status")
+```
+
+>Sourced from the Virginia Department of Education
